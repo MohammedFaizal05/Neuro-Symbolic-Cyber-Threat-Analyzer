@@ -37,6 +37,17 @@ It generates **attack summaries, risk scores, defensive actions (MITRE D3FEND)**
   - Defense recommendations  
   - Error-handling & stability
 
+---
+
+## 📁 Project Structure  
+- **├── src/**
+- **├────── app.py**
+- **├────── llm_client.py**
+- **├────── ontology_engine.py**
+- **├────── pipeline.py**
+- **├── ontology/ # OWL ontology + reasoning utilities**
+- **├───────cyber_ontology.owl**
+- **└── README.md**
 
 ---
 
