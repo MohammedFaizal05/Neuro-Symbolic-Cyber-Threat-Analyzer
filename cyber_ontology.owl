@@ -1,0 +1,629 @@
+<?xml version="1.0"?>
+<rdf:RDF
+    xmlns="http://www.semanticweb.org/faizal/cyber_ontology#"
+    xml:base="http://www.semanticweb.org/faizal/cyber_ontology"
+    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:owl="http://www.w3.org/2002/07/owl#"
+    xmlns:xml="http://www.w3.org/XML/1998/namespace"
+    xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+    xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#">
+
+    <!-- Ontology header -->
+    <owl:Ontology rdf:about="http://www.semanticweb.org/faizal/cyber_ontology"/>
+
+    <!-- =======================
+         1. CLASSES
+         ======================= -->
+
+    <owl:Class rdf:about="#Tactic"/>
+    <owl:Class rdf:about="#Technique"/>
+    <owl:Class rdf:about="#Vulnerability"/>
+    <owl:Class rdf:about="#Asset"/>
+    <owl:Class rdf:about="#Indicator"/>
+    <owl:Class rdf:about="#Malware"/>
+    <owl:Class rdf:about="#ThreatActor"/>
+
+    <!-- =======================
+         2. OBJECT PROPERTIES
+         ======================= -->
+
+    <!-- Technique -> Tactic -->
+    <owl:ObjectProperty rdf:about="#belongsToTactic">
+        <rdfs:domain rdf:resource="#Technique"/>
+        <rdfs:range rdf:resource="#Tactic"/>
+    </owl:ObjectProperty>
+
+    <!-- Technique -> Asset -->
+    <owl:ObjectProperty rdf:about="#targetsAsset">
+        <rdfs:domain rdf:resource="#Technique"/>
+        <rdfs:range rdf:resource="#Asset"/>
+    </owl:ObjectProperty>
+
+    <!-- Vulnerability -> Technique -->
+    <owl:ObjectProperty rdf:about="#usesTechnique">
+        <rdfs:domain rdf:resource="#Vulnerability"/>
+        <rdfs:range rdf:resource="#Technique"/>
+    </owl:ObjectProperty>
+
+    <!-- =======================
+         3. TACTIC INDIVIDUALS
+         ======================= -->
+
+    <owl:NamedIndividual rdf:about="#Reconnaissance">
+        <rdf:type rdf:resource="#Tactic"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#ResourceDevelopment">
+        <rdf:type rdf:resource="#Tactic"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#InitialAccess">
+        <rdf:type rdf:resource="#Tactic"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#Execution">
+        <rdf:type rdf:resource="#Tactic"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#Persistence">
+        <rdf:type rdf:resource="#Tactic"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#PrivilegeEscalation">
+        <rdf:type rdf:resource="#Tactic"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#DefenseEvasion">
+        <rdf:type rdf:resource="#Tactic"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#CredentialAccess">
+        <rdf:type rdf:resource="#Tactic"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#Discovery">
+        <rdf:type rdf:resource="#Tactic"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#LateralMovement">
+        <rdf:type rdf:resource="#Tactic"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#Collection">
+        <rdf:type rdf:resource="#Tactic"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#CommandAndControl">
+        <rdf:type rdf:resource="#Tactic"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#Exfiltration">
+        <rdf:type rdf:resource="#Tactic"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#Impact">
+        <rdf:type rdf:resource="#Tactic"/>
+    </owl:NamedIndividual>
+
+    <!-- =======================
+         4. ASSET INDIVIDUALS
+         ======================= -->
+
+    <owl:NamedIndividual rdf:about="#WebServer">
+        <rdf:type rdf:resource="#Asset"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#DatabaseServer">
+        <rdf:type rdf:resource="#Asset"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#Workstation">
+        <rdf:type rdf:resource="#Asset"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#DomainController">
+        <rdf:type rdf:resource="#Asset"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#EmailServer">
+        <rdf:type rdf:resource="#Asset"/>
+    </owl:NamedIndividual>
+
+    <!-- =======================
+         5. TECHNIQUE INDIVIDUALS
+         (25 total)
+         ======================= -->
+
+    <!-- 5.1 Reconnaissance -->
+
+    <owl:NamedIndividual rdf:about="#T1595_ActiveScanning">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#Reconnaissance"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#T1592_CollectVictimInformation">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#Reconnaissance"/>
+    </owl:NamedIndividual>
+
+    <!-- 5.2 Resource Development -->
+
+    <owl:NamedIndividual rdf:about="#T1583_DevelopInfrastructure">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#ResourceDevelopment"/>
+    </owl:NamedIndividual>
+
+    <!-- 5.3 Initial Access -->
+
+    <owl:NamedIndividual rdf:about="#T1566_Phishing">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#InitialAccess"/>
+        <targetsAsset rdf:resource="#EmailServer"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#T1566_SpearphishingAttachment">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#InitialAccess"/>
+        <targetsAsset rdf:resource="#Workstation"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#T1190_ExploitPublicFacingApplication">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#InitialAccess"/>
+        <targetsAsset rdf:resource="#WebServer"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#T1078_ValidAccounts">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#InitialAccess"/>
+        <belongsToTactic rdf:resource="#Persistence"/>
+    </owl:NamedIndividual>
+
+    <!-- 5.4 Execution -->
+
+    <owl:NamedIndividual rdf:about="#T1059_CommandLineExecution">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#Execution"/>
+        <targetsAsset rdf:resource="#Workstation"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#T1059_PowerShell">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#Execution"/>
+        <targetsAsset rdf:resource="#Workstation"/>
+    </owl:NamedIndividual>
+
+    <!-- 5.5 Persistence -->
+
+    <owl:NamedIndividual rdf:about="#T1053_ScheduledTask">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#Persistence"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#T1547_BootOrLogonAutostart">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#Persistence"/>
+    </owl:NamedIndividual>
+
+    <!-- 5.6 Privilege Escalation -->
+
+    <owl:NamedIndividual rdf:about="#T1068_PrivilegeEscalation">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#PrivilegeEscalation"/>
+    </owl:NamedIndividual>
+
+    <!-- 5.7 Credential Access -->
+
+    <owl:NamedIndividual rdf:about="#T1003_CredentialDumping">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#CredentialAccess"/>
+        <targetsAsset rdf:resource="#Workstation"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#T1555_StealCredentials">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#CredentialAccess"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#T1110_BruteForce">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#CredentialAccess"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#T1040_NetworkSniffing">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#CredentialAccess"/>
+        <belongsToTactic rdf:resource="#Discovery"/>
+    </owl:NamedIndividual>
+
+    <!-- 5.8 Discovery -->
+
+    <owl:NamedIndividual rdf:about="#T1087_AccountDiscovery">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#Discovery"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#T1046_NetworkServiceScanning">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#Discovery"/>
+    </owl:NamedIndividual>
+
+    <!-- 5.9 Lateral Movement -->
+
+    <owl:NamedIndividual rdf:about="#T1021_RemoteServices">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#LateralMovement"/>
+        <targetsAsset rdf:resource="#Workstation"/>
+    </owl:NamedIndividual>
+
+    <!-- 5.10 Collection -->
+
+    <owl:NamedIndividual rdf:about="#T1005_DataFromLocalSystem">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#Collection"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#T1114_EmailCollection">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#Collection"/>
+        <targetsAsset rdf:resource="#EmailServer"/>
+    </owl:NamedIndividual>
+
+    <!-- 5.11 Command and Control -->
+
+    <owl:NamedIndividual rdf:about="#T1105_IngressToolTransfer">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#CommandAndControl"/>
+    </owl:NamedIndividual>
+
+    <!-- 5.12 Exfiltration -->
+
+    <owl:NamedIndividual rdf:about="#T1041_ExfiltrationOverC2Channel">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#Exfiltration"/>
+        <belongsToTactic rdf:resource="#CommandAndControl"/>
+    </owl:NamedIndividual>
+
+    <!-- 5.13 Impact -->
+
+    <owl:NamedIndividual rdf:about="#T1486_DataEncryptedForImpact">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#Impact"/>
+        <targetsAsset rdf:resource="#Workstation"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#T1565_DataManipulation">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#Impact"/>
+    </owl:NamedIndividual>
+
+    <!-- =======================
+         6. SAMPLE VULNERABILITIES
+         ======================= -->
+
+    <owl:NamedIndividual rdf:about="#CVE_2021_44228_Log4Shell">
+        <rdf:type rdf:resource="#Vulnerability"/>
+        <usesTechnique rdf:resource="#T1190_ExploitPublicFacingApplication"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#CVE_2020_1472_Zerologon">
+        <rdf:type rdf:resource="#Vulnerability"/>
+        <usesTechnique rdf:resource="#T1068_PrivilegeEscalation"/>
+        <usesTechnique rdf:resource="#T1021_RemoteServices"/>
+    </owl:NamedIndividual>
+
+
+        <!-- =======================
+         EXTRA CLASSES (Option C)
+         ======================= -->
+
+    <owl:Class rdf:about="#DefensiveTechnique"/>
+    <owl:Class rdf:about="#Campaign"/>
+    <owl:Class rdf:about="#CWEWeakness"/>
+    <owl:Class rdf:about="#CAPECPattern"/>
+
+    <!-- =======================
+         EXTRA OBJECT PROPERTIES
+         ======================= -->
+
+    <!-- DefensiveTechnique -> Technique -->
+    <owl:ObjectProperty rdf:about="#mitigates">
+        <rdfs:domain rdf:resource="#DefensiveTechnique"/>
+        <rdfs:range rdf:resource="#Technique"/>
+    </owl:ObjectProperty>
+
+    <!-- Malware -> Technique -->
+    <owl:ObjectProperty rdf:about="#malwareUsesTechnique">
+        <rdfs:domain rdf:resource="#Malware"/>
+        <rdfs:range rdf:resource="#Technique"/>
+    </owl:ObjectProperty>
+
+    <!-- ThreatActor -> Technique -->
+    <owl:ObjectProperty rdf:about="#actorUsesTechnique">
+        <rdfs:domain rdf:resource="#ThreatActor"/>
+        <rdfs:range rdf:resource="#Technique"/>
+    </owl:ObjectProperty>
+
+    <!-- CWE/CAPEC relations -->
+    <owl:ObjectProperty rdf:about="#relatedToWeakness">
+        <rdfs:domain rdf:resource="#Technique"/>
+        <rdfs:range rdf:resource="#CWEWeakness"/>
+    </owl:ObjectProperty>
+
+    <owl:ObjectProperty rdf:about="#relatedToPattern">
+        <rdfs:domain rdf:resource="#Technique"/>
+        <rdfs:range rdf:resource="#CAPECPattern"/>
+    </owl:ObjectProperty>
+
+    <!-- =======================
+         EXTRA TECHNIQUES
+         ======================= -->
+
+    <!-- Defense Evasion / Execution -->
+
+    <owl:NamedIndividual rdf:about="#T1055_ProcessInjection">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#Execution"/>
+        <belongsToTactic rdf:resource="#PrivilegeEscalation"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#T1218_SignedBinaryProxyExecution">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#DefenseEvasion"/>
+        <belongsToTactic rdf:resource="#Execution"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#T1036_Masquerading">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#DefenseEvasion"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#T1027_ObfuscatedFilesOrInformation">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#DefenseEvasion"/>
+    </owl:NamedIndividual>
+
+    <!-- Persistence / Initial Access -->
+
+    <owl:NamedIndividual rdf:about="#T1136_CreateAccount">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#Persistence"/>
+        <belongsToTactic rdf:resource="#InitialAccess"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#T1195_SupplyChainCompromise">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#InitialAccess"/>
+        <belongsToTactic rdf:resource="#ResourceDevelopment"/>
+    </owl:NamedIndividual>
+
+    <!-- Command and Control -->
+
+    <owl:NamedIndividual rdf:about="#T1071_ApplicationLayerProtocol">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#CommandAndControl"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#T1573_EncryptedChannel">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#CommandAndControl"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#T1102_WebService">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#CommandAndControl"/>
+    </owl:NamedIndividual>
+
+    <!-- Collection / Exfiltration -->
+
+    <owl:NamedIndividual rdf:about="#T1119_ClipboardData">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#Collection"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#T1020_AutomatedExfiltration">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#Exfiltration"/>
+    </owl:NamedIndividual>
+
+    <!-- Impact -->
+
+    <owl:NamedIndividual rdf:about="#T1489_ServiceStop">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#Impact"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#T1490_InhibitSystemRecovery">
+        <rdf:type rdf:resource="#Technique"/>
+        <belongsToTactic rdf:resource="#Impact"/>
+    </owl:NamedIndividual>
+
+    <!-- =======================
+         MALWARE FAMILIES
+         ======================= -->
+
+    <owl:NamedIndividual rdf:about="#Emotet">
+        <rdf:type rdf:resource="#Malware"/>
+        <malwareUsesTechnique rdf:resource="#T1566_Phishing"/>
+        <malwareUsesTechnique rdf:resource="#T1105_IngressToolTransfer"/>
+        <malwareUsesTechnique rdf:resource="#T1059_PowerShell"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#TrickBot">
+        <rdf:type rdf:resource="#Malware"/>
+        <malwareUsesTechnique rdf:resource="#T1059_CommandLineExecution"/>
+        <malwareUsesTechnique rdf:resource="#T1003_CredentialDumping"/>
+        <malwareUsesTechnique rdf:resource="#T1021_RemoteServices"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#RyukRansomware">
+        <rdf:type rdf:resource="#Malware"/>
+        <malwareUsesTechnique rdf:resource="#T1486_DataEncryptedForImpact"/>
+        <malwareUsesTechnique rdf:resource="#T1489_ServiceStop"/>
+        <malwareUsesTechnique rdf:resource="#T1490_InhibitSystemRecovery"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#WannaCry">
+        <rdf:type rdf:resource="#Malware"/>
+        <malwareUsesTechnique rdf:resource="#T1190_ExploitPublicFacingApplication"/>
+        <malwareUsesTechnique rdf:resource="#T1486_DataEncryptedForImpact"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#CobaltStrike">
+        <rdf:type rdf:resource="#Malware"/>
+        <malwareUsesTechnique rdf:resource="#T1105_IngressToolTransfer"/>
+        <malwareUsesTechnique rdf:resource="#T1071_ApplicationLayerProtocol"/>
+        <malwareUsesTechnique rdf:resource="#T1573_EncryptedChannel"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#AgentTesla">
+        <rdf:type rdf:resource="#Malware"/>
+        <malwareUsesTechnique rdf:resource="#T1005_DataFromLocalSystem"/>
+        <malwareUsesTechnique rdf:resource="#T1041_ExfiltrationOverC2Channel"/>
+    </owl:NamedIndividual>
+
+    <!-- =======================
+         THREAT ACTORS
+         ======================= -->
+
+    <owl:NamedIndividual rdf:about="#APT29">
+        <rdf:type rdf:resource="#ThreatActor"/>
+        <actorUsesTechnique rdf:resource="#T1566_SpearphishingAttachment"/>
+        <actorUsesTechnique rdf:resource="#T1059_PowerShell"/>
+        <actorUsesTechnique rdf:resource="#T1105_IngressToolTransfer"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#LazarusGroup">
+        <rdf:type rdf:resource="#ThreatActor"/>
+        <actorUsesTechnique rdf:resource="#T1190_ExploitPublicFacingApplication"/>
+        <actorUsesTechnique rdf:resource="#T1021_RemoteServices"/>
+        <actorUsesTechnique rdf:resource="#T1486_DataEncryptedForImpact"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#FIN7">
+        <rdf:type rdf:resource="#ThreatActor"/>
+        <actorUsesTechnique rdf:resource="#T1566_Phishing"/>
+        <actorUsesTechnique rdf:resource="#T1055_ProcessInjection"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#ContiGroup">
+        <rdf:type rdf:resource="#ThreatActor"/>
+        <actorUsesTechnique rdf:resource="#T1003_CredentialDumping"/>
+        <actorUsesTechnique rdf:resource="#T1021_RemoteServices"/>
+        <actorUsesTechnique rdf:resource="#T1486_DataEncryptedForImpact"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#APT41">
+        <rdf:type rdf:resource="#ThreatActor"/>
+        <actorUsesTechnique rdf:resource="#T1195_SupplyChainCompromise"/>
+        <actorUsesTechnique rdf:resource="#T1059_CommandLineExecution"/>
+    </owl:NamedIndividual>
+
+    <!-- =======================
+         DEFENSIVE TECHNIQUES (D3FEND-like)
+         ======================= -->
+
+    <owl:NamedIndividual rdf:about="#D_EmailFiltering">
+        <rdf:type rdf:resource="#DefensiveTechnique"/>
+        <mitigates rdf:resource="#T1566_Phishing"/>
+        <mitigates rdf:resource="#T1566_SpearphishingAttachment"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#D_WebApplicationFirewall">
+        <rdf:type rdf:resource="#DefensiveTechnique"/>
+        <mitigates rdf:resource="#T1190_ExploitPublicFacingApplication"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#D_EDRMonitoring">
+        <rdf:type rdf:resource="#DefensiveTechnique"/>
+        <mitigates rdf:resource="#T1059_CommandLineExecution"/>
+        <mitigates rdf:resource="#T1059_PowerShell"/>
+        <mitigates rdf:resource="#T1055_ProcessInjection"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#D_NetworkSegmentation">
+        <rdf:type rdf:resource="#DefensiveTechnique"/>
+        <mitigates rdf:resource="#T1021_RemoteServices"/>
+        <mitigates rdf:resource="#T1041_ExfiltrationOverC2Channel"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#D_BackupAndRecovery">
+        <rdf:type rdf:resource="#DefensiveTechnique"/>
+        <mitigates rdf:resource="#T1486_DataEncryptedForImpact"/>
+        <mitigates rdf:resource="#T1489_ServiceStop"/>
+        <mitigates rdf:resource="#T1490_InhibitSystemRecovery"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#D_MFAAndStrongAuth">
+        <rdf:type rdf:resource="#DefensiveTechnique"/>
+        <mitigates rdf:resource="#T1078_ValidAccounts"/>
+        <mitigates rdf:resource="#T1110_BruteForce"/>
+        <mitigates rdf:resource="#T1555_StealCredentials"/>
+    </owl:NamedIndividual>
+
+    <!-- =======================
+         WEAKNESSES (CWE)
+         ======================= -->
+
+    <owl:NamedIndividual rdf:about="#CWE_89_SQLInjection">
+        <rdf:type rdf:resource="#CWEWeakness"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#CWE_79_XSS">
+        <rdf:type rdf:resource="#CWEWeakness"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#CWE_287_ImproperAuth">
+        <rdf:type rdf:resource="#CWEWeakness"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#CWE_522_InsufficientPasswordStorage">
+        <rdf:type rdf:resource="#CWEWeakness"/>
+    </owl:NamedIndividual>
+
+    <!-- Link a few techniques to weaknesses -->
+
+    <rdf:Description rdf:about="#T1190_ExploitPublicFacingApplication">
+        <relatedToWeakness rdf:resource="#CWE_89_SQLInjection"/>
+    </rdf:Description>
+
+    <rdf:Description rdf:about="#T1078_ValidAccounts">
+        <relatedToWeakness rdf:resource="#CWE_287_ImproperAuth"/>
+    </rdf:Description>
+
+    <rdf:Description rdf:about="#T1555_StealCredentials">
+        <relatedToWeakness rdf:resource="#CWE_522_InsufficientPasswordStorage"/>
+    </rdf:Description>
+
+
+
+    <!-- =======================
+         ATTACK PATTERNS (CAPEC)
+         ======================= -->
+
+    <owl:NamedIndividual rdf:about="#CAPEC_112_SQLInjection">
+        <rdf:type rdf:resource="#CAPECPattern"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#CAPEC_98_BufferOverflow">
+        <rdf:type rdf:resource="#CAPECPattern"/>
+    </owl:NamedIndividual>
+
+    <owl:NamedIndividual rdf:about="#CAPEC_163_Phishing">
+        <rdf:type rdf:resource="#CAPECPattern"/>
+    </owl:NamedIndividual>
+
+    <!-- Link techniques to CAPEC -->
+
+    <rdf:Description rdf:about="#T1190_ExploitPublicFacingApplication">
+        <relatedToPattern rdf:resource="#CAPEC_112_SQLInjection"/>
+    </rdf:Description>
+
+    <rdf:Description rdf:about="#T1566_Phishing">
+        <relatedToPattern rdf:resource="#CAPEC_163_Phishing"/>
+    </rdf:Description>
+
+
+
+
+</rdf:RDF>
