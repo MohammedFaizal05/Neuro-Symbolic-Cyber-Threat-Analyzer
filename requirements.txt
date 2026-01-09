@@ -1,0 +1,20 @@
+streamlit==1.32.0
+requests==2.31.0
+rdflib==7.0.0
+pandas==2.2.0
+numpy==1.26.3
+pydantic==2.5.3
+typing_extensions==4.9.0
+tqdm==4.66.1
+
+# For ontology parsing & reasoning
+owlrl==6.0.2
+
+# If using local LLM calls (Ollama API)
+httpx==0.26.0
+
+# For colored logging / formatting
+rich==13.7.0
+
+# Optional but recommended for debugging
+python-dotenv==1.0.1
