@@ -32,7 +32,10 @@ class IOCReputationChecker:
     def __init__(self):
         self.abuseipdb_key = ABUSEIPDB_API_KEY
         self.virustotal_key = VIRUSTOTAL_API_KEY
-        self.rate_limit_delay = 0.25  # 4 requests per second for VirusTotal free tier
+        # VirusTotal free tier: 4 requests per MINUTE (not per second!)
+        # So we need 15 seconds delay between requests (60/4 = 15)
+        self.rate_limit_delay = 15.0  # 15 seconds between requests for VirusTotal free tier
+        self.last_vt_request_time = 0  # Track last request time for rate limiting
     
     def check_ip_reputation(self, ip: str) -> Dict[str, Any]:
         """
@@ -139,8 +142,13 @@ class IOCReputationChecker:
             }
         
         try:
-            # Rate limiting for free tier
-            time.sleep(self.rate_limit_delay)
+            # Rate limiting for free tier (4 requests per minute = 15 seconds between requests)
+            current_time = time.time()
+            time_since_last_request = current_time - self.last_vt_request_time
+            if time_since_last_request < self.rate_limit_delay:
+                sleep_time = self.rate_limit_delay - time_since_last_request
+                time.sleep(sleep_time)
+            self.last_vt_request_time = time.time()
             
             if resource_type == "url":
                 # URL needs to be encoded
@@ -173,11 +181,23 @@ class IOCReputationChecker:
             
             response = requests.get(url_endpoint, params=params, timeout=15)
             
+            # Check for rate limiting (HTTP 429 or 204)
+            if response.status_code == 429:
+                return {
+                    "status": "error",
+                    "error": "VirusTotal API rate limit exceeded. Free tier allows 4 requests per minute. Please wait and try again."
+                }
+            if response.status_code == 204:
+                return {
+                    "status": "error",
+                    "error": "VirusTotal API rate limit exceeded (HTTP 204). Free tier allows 4 requests per minute."
+                }
+            
             # Check if response has content
             if not response.text or not response.text.strip():
                 return {
                     "status": "error",
-                    "error": "VirusTotal API returned empty response. This may indicate rate limiting, invalid API key, or API issues."
+                    "error": "VirusTotal API returned empty response. Possible causes: rate limiting (4 req/min), invalid API key, or API issues. Check your VIRUSTOTAL_API_KEY in .env file."
                 }
             
             # Check if response is HTML (error page) instead of JSON
@@ -193,6 +213,12 @@ class IOCReputationChecker:
             except ValueError as e:
                 # JSON decode error - response is not valid JSON
                 error_preview = response.text[:200] if len(response.text) > 200 else response.text
+                # Check for common error messages
+                if "API key" in error_preview.lower() or "authentication" in error_preview.lower():
+                    return {
+                        "status": "error",
+                        "error": "VirusTotal API key appears to be invalid. Please check your VIRUSTOTAL_API_KEY in .env file."
+                    }
                 return {
                     "status": "error",
                     "error": f"VirusTotal API returned invalid JSON (may be rate limited or API key issue). Response preview: {error_preview}"
@@ -200,9 +226,15 @@ class IOCReputationChecker:
             
             # Check HTTP status code
             if response.status_code != 200:
+                error_msg = response.text[:200] if response.text else "No error message"
+                if response.status_code == 403:
+                    return {
+                        "status": "error",
+                        "error": "VirusTotal API returned 403 Forbidden. Your API key may be invalid or expired. Check your VIRUSTOTAL_API_KEY in .env file."
+                    }
                 return {
                     "status": "error",
-                    "error": f"VirusTotal API returned status {response.status_code}: {response.text[:200]}"
+                    "error": f"VirusTotal API returned status {response.status_code}: {error_msg}"
                 }
             
             # Check response code
@@ -315,6 +347,12 @@ class IOCReputationChecker:
                 pass
         
         # Check domains with VirusTotal
+        # Note: With free tier (4 req/min), checking many domains will take time
+        total_vt_checks = len(iocs.get("urls", [])) + len(domains_to_check) + len([h for h in iocs.get("hashes", []) if len(h) in [32, 40, 64]])
+        if total_vt_checks > 4:
+            # Warn user that this will take a while due to rate limits
+            print(f"Warning: {total_vt_checks} VirusTotal checks requested. Free tier allows 4 requests/minute, so this will take approximately {((total_vt_checks - 1) * 15) / 60:.1f} minutes.")
+        
         for domain in domains_to_check:
             results["domains"][domain] = self.check_virustotal(domain, "domain")
         
