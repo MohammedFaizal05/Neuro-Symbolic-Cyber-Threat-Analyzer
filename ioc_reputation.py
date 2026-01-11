@@ -17,12 +17,33 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# API Configuration
-ABUSEIPDB_API_KEY = os.getenv("ABUSEIPDB_API_KEY", "")
-VIRUSTOTAL_API_KEY = os.getenv("VIRUSTOTAL_API_KEY", "")
+# API Configuration - Support multiple API keys for fallback
+def _load_api_keys(prefix: str, max_keys: int = 3) -> List[str]:
+    """Load multiple API keys from environment variables."""
+    keys = []
+    for i in range(1, max_keys + 1):
+        if i == 1:
+            # First key can be without number or with _1
+            key = os.getenv(f"{prefix}_API_KEY", "") or os.getenv(f"{prefix}_API_KEY_1", "")
+        else:
+            key = os.getenv(f"{prefix}_API_KEY_{i}", "")
+        if key:
+            keys.append(key)
+    return keys
+
+ABUSEIPDB_KEYS = _load_api_keys("ABUSEIPDB", max_keys=3)
+VIRUSTOTAL_KEYS = _load_api_keys("VIRUSTOTAL", max_keys=3)
+
+# Backward compatibility - keep old variable names for reference
+ABUSEIPDB_API_KEY = ABUSEIPDB_KEYS[0] if ABUSEIPDB_KEYS else ""
+VIRUSTOTAL_API_KEY = VIRUSTOTAL_KEYS[0] if VIRUSTOTAL_KEYS else ""
 
 ABUSEIPDB_URL = "https://api.abuseipdb.com/api/v2/check"
 VIRUSTOTAL_URL = "https://www.virustotal.com/vtapi/v2"
+
+# Note: VirusTotal API v2 has rate limits:
+# - Free tier: 4 requests per minute
+# - Domain reports may return empty if not scanned before
 
 
 class IOCReputationChecker:
