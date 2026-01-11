@@ -9,6 +9,7 @@ All API calls are server-side only for security.
 
 import os
 import time
+import base64
 import requests
 from typing import Dict, List, Optional, Any
 from urllib.parse import urlparse
@@ -151,11 +152,13 @@ class IOCReputationChecker:
             self.last_vt_request_time = time.time()
             
             if resource_type == "url":
-                # URL needs to be encoded
+                # VirusTotal v2 API requires URL to be base64 encoded
                 url_endpoint = f"{VIRUSTOTAL_URL}/url/report"
+                # Base64 encode the URL (without padding, as VT expects)
+                encoded_resource = base64.urlsafe_b64encode(resource.encode()).decode().rstrip('=')
                 params = {
                     "apikey": self.virustotal_key,
-                    "resource": resource
+                    "resource": encoded_resource
                 }
             elif resource_type == "domain":
                 # VirusTotal v2 API doesn't have a direct domain endpoint
@@ -163,9 +166,11 @@ class IOCReputationChecker:
                 url_endpoint = f"{VIRUSTOTAL_URL}/url/report"
                 # Convert domain to URL format for checking
                 domain_url = f"http://{resource}" if not resource.startswith(("http://", "https://")) else resource
+                # Base64 encode the domain URL (without padding)
+                encoded_resource = base64.urlsafe_b64encode(domain_url.encode()).decode().rstrip('=')
                 params = {
                     "apikey": self.virustotal_key,
-                    "resource": domain_url
+                    "resource": encoded_resource
                 }
             elif resource_type == "hash":
                 url_endpoint = f"{VIRUSTOTAL_URL}/file/report"
@@ -195,10 +200,22 @@ class IOCReputationChecker:
             
             # Check if response has content
             if not response.text or not response.text.strip():
-                return {
-                    "status": "error",
-                    "error": "VirusTotal API returned empty response. Possible causes: rate limiting (4 req/min), invalid API key, or API issues. Check your VIRUSTOTAL_API_KEY in .env file."
-                }
+                # Empty response might mean the resource hasn't been scanned yet
+                # For domains/URLs, return "clean" with a note instead of error
+                if resource_type in ["url", "domain"]:
+                    return {
+                        "status": "clean",
+                        "positives": 0,
+                        "total": 0,
+                        "scan_date": None,
+                        "permalink": None,
+                        "message": "Resource not yet scanned by VirusTotal. Empty response may indicate the domain/URL hasn't been analyzed yet."
+                    }
+                else:
+                    return {
+                        "status": "error",
+                        "error": "VirusTotal API returned empty response. Possible causes: rate limiting (4 req/min), invalid API key, or API issues. Check your VIRUSTOTAL_API_KEY in .env file."
+                    }
             
             # Check if response is HTML (error page) instead of JSON
             if response.text.strip().startswith('<') or '<html' in response.text.lower()[:100]:
