@@ -31,12 +31,38 @@ class IOCReputationChecker:
     """
     
     def __init__(self):
-        self.abuseipdb_key = ABUSEIPDB_API_KEY
-        self.virustotal_key = VIRUSTOTAL_API_KEY
+        self.abuseipdb_keys = ABUSEIPDB_KEYS
+        self.virustotal_keys = VIRUSTOTAL_KEYS
+        self.current_abuseipdb_key_index = 0
+        self.current_virustotal_key_index = 0
         # VirusTotal free tier: 4 requests per MINUTE (not per second!)
         # So we need 15 seconds delay between requests (60/4 = 15)
         self.rate_limit_delay = 15.0  # 15 seconds between requests for VirusTotal free tier
         self.last_vt_request_time = 0  # Track last request time for rate limiting
+        # Track last request time per key for better rate limiting
+        self.last_vt_request_times = {i: 0 for i in range(len(self.virustotal_keys))}
+    
+    def _get_current_abuseipdb_key(self) -> Optional[str]:
+        """Get current AbuseIPDB API key."""
+        if not self.abuseipdb_keys:
+            return None
+        return self.abuseipdb_keys[self.current_abuseipdb_key_index % len(self.abuseipdb_keys)]
+    
+    def _get_current_virustotal_key(self) -> Optional[str]:
+        """Get current VirusTotal API key."""
+        if not self.virustotal_keys:
+            return None
+        return self.virustotal_keys[self.current_virustotal_key_index % len(self.virustotal_keys)]
+    
+    def _rotate_abuseipdb_key(self):
+        """Rotate to next AbuseIPDB API key."""
+        if len(self.abuseipdb_keys) > 1:
+            self.current_abuseipdb_key_index = (self.current_abuseipdb_key_index + 1) % len(self.abuseipdb_keys)
+    
+    def _rotate_virustotal_key(self):
+        """Rotate to next VirusTotal API key."""
+        if len(self.virustotal_keys) > 1:
+            self.current_virustotal_key_index = (self.current_virustotal_key_index + 1) % len(self.virustotal_keys)
     
     def check_ip_reputation(self, ip: str) -> Dict[str, Any]:
         """
@@ -56,67 +82,123 @@ class IOCReputationChecker:
                 "error": str (if status is "error")
             }
         """
-        if not self.abuseipdb_key:
+        if not self.abuseipdb_keys:
             return {
                 "status": "error",
                 "error": "AbuseIPDB API key not configured. Set ABUSEIPDB_API_KEY in .env file."
             }
         
-        try:
-            headers = {
-                "Key": self.abuseipdb_key,
-                "Accept": "application/json"
-            }
-            params = {
-                "ipAddress": ip,
-                "maxAgeInDays": 90,
-                "verbose": ""
-            }
+        # Try all keys in sequence if one fails
+        last_error = None
+        for attempt in range(len(self.abuseipdb_keys)):
+            current_key = self._get_current_abuseipdb_key()
+            if not current_key:
+                break
             
-            response = requests.get(ABUSEIPDB_URL, headers=headers, params=params, timeout=10)
-            response.raise_for_status()
-            data = response.json()
-            
-            if "data" in data:
-                result = data["data"]
-                abuse_confidence = result.get("abuseConfidencePercentage", 0)
-                reports = result.get("totalReports", 0)
+            try:
+                headers = {
+                    "Key": current_key,
+                    "Accept": "application/json"
+                }
+                params = {
+                    "ipAddress": ip,
+                    "maxAgeInDays": 90,
+                    "verbose": ""
+                }
                 
-                # Determine status
-                if abuse_confidence >= 75 or reports >= 5:
-                    status = "malicious"
-                elif abuse_confidence >= 25 or reports >= 1:
-                    status = "suspicious"
+                response = requests.get(ABUSEIPDB_URL, headers=headers, params=params, timeout=10)
+                
+                # Check for rate limiting or authentication errors
+                if response.status_code == 429:
+                    # Rate limit - try next key
+                    self._rotate_abuseipdb_key()
+                    last_error = "Rate limit exceeded, trying next key..."
+                    if attempt < len(self.abuseipdb_keys) - 1:
+                        continue
+                    else:
+                        return {
+                            "status": "error",
+                            "error": "All AbuseIPDB API keys rate limited. Please wait and try again."
+                        }
+                
+                if response.status_code == 401 or response.status_code == 403:
+                    # Invalid API key - try next key
+                    self._rotate_abuseipdb_key()
+                    last_error = f"API key authentication failed (HTTP {response.status_code}), trying next key..."
+                    if attempt < len(self.abuseipdb_keys) - 1:
+                        continue
+                    else:
+                        return {
+                            "status": "error",
+                            "error": "All AbuseIPDB API keys are invalid. Please check your API keys in .env file."
+                        }
+                
+                response.raise_for_status()
+                data = response.json()
+                
+                if "data" in data:
+                    result = data["data"]
+                    abuse_confidence = result.get("abuseConfidencePercentage", 0)
+                    reports = result.get("totalReports", 0)
+                    
+                    # Determine status
+                    if abuse_confidence >= 75 or reports >= 5:
+                        status = "malicious"
+                    elif abuse_confidence >= 25 or reports >= 1:
+                        status = "suspicious"
+                    else:
+                        status = "clean"
+                    
+                    return {
+                        "status": status,
+                        "abuse_confidence": abuse_confidence,
+                        "usage_type": result.get("usageType", "Unknown"),
+                        "isp": result.get("isp", "Unknown"),
+                        "country": result.get("countryCode", "Unknown"),
+                        "is_public": result.get("isPublic", False),
+                        "is_whitelisted": result.get("isWhitelisted", False),
+                        "reports": reports,
+                        "last_reported": result.get("lastReportedAt", "Never")
+                    }
                 else:
-                    status = "clean"
+                    # Unexpected response format - try next key
+                    self._rotate_abuseipdb_key()
+                    last_error = "Unexpected response format from AbuseIPDB"
+                    if attempt < len(self.abuseipdb_keys) - 1:
+                        continue
+                    else:
+                        return {
+                            "status": "error",
+                            "error": last_error
+                        }
                 
-                return {
-                    "status": status,
-                    "abuse_confidence": abuse_confidence,
-                    "usage_type": result.get("usageType", "Unknown"),
-                    "isp": result.get("isp", "Unknown"),
-                    "country": result.get("countryCode", "Unknown"),
-                    "is_public": result.get("isPublic", False),
-                    "is_whitelisted": result.get("isWhitelisted", False),
-                    "reports": reports,
-                    "last_reported": result.get("lastReportedAt", "Never")
-                }
-            else:
-                return {
-                    "status": "error",
-                    "error": "Unexpected response format from AbuseIPDB"
-                }
-                
-        except requests.exceptions.RequestException as e:
-            return {
-                "status": "error",
-                "error": f"AbuseIPDB API error: {str(e)}"
-            }
-        except Exception as e:
-            return {
-                "status": "error",
-                "error": f"Unexpected error: {str(e)}"
-            }
+            except requests.exceptions.RequestException as e:
+                last_error = f"AbuseIPDB API error: {str(e)}"
+                # Try next key if available
+                if attempt < len(self.abuseipdb_keys) - 1:
+                    self._rotate_abuseipdb_key()
+                    continue
+                else:
+                    return {
+                        "status": "error",
+                        "error": f"All AbuseIPDB API keys failed. Last error: {last_error}"
+                    }
+            except Exception as e:
+                last_error = f"Unexpected error: {str(e)}"
+                if attempt < len(self.abuseipdb_keys) - 1:
+                    self._rotate_abuseipdb_key()
+                    continue
+                else:
+                    return {
+                        "status": "error",
+                        "error": f"All AbuseIPDB API keys failed. Last error: {last_error}"
+                    }
+        
+        # If we get here, all keys failed
+        return {
+            "status": "error",
+            "error": f"All AbuseIPDB API keys failed. Last error: {last_error or 'Unknown error'}"
+        }
     
     def check_virustotal(self, resource: str, resource_type: str) -> Dict[str, Any]:
         """
@@ -136,186 +218,259 @@ class IOCReputationChecker:
                 "error": str (if status is "error")
             }
         """
-        if not self.virustotal_key:
+        if not self.virustotal_keys:
             return {
                 "status": "error",
                 "error": "VirusTotal API key not configured. Set VIRUSTOTAL_API_KEY in .env file."
             }
         
-        try:
-            # Rate limiting for free tier (4 requests per minute = 15 seconds between requests)
-            current_time = time.time()
-            time_since_last_request = current_time - self.last_vt_request_time
-            if time_since_last_request < self.rate_limit_delay:
-                sleep_time = self.rate_limit_delay - time_since_last_request
-                time.sleep(sleep_time)
-            self.last_vt_request_time = time.time()
+        # Try all keys in sequence if one fails
+        last_error = None
+        for attempt in range(len(self.virustotal_keys)):
+            current_key = self._get_current_virustotal_key()
+            if not current_key:
+                break
             
-            if resource_type == "url":
-                # VirusTotal v2 API requires URL to be base64 encoded
-                url_endpoint = f"{VIRUSTOTAL_URL}/url/report"
-                # Base64 encode the URL (without padding, as VT expects)
-                encoded_resource = base64.urlsafe_b64encode(resource.encode()).decode().rstrip('=')
-                params = {
-                    "apikey": self.virustotal_key,
-                    "resource": encoded_resource
-                }
-            elif resource_type == "domain":
-                # VirusTotal v2 API doesn't have a direct domain endpoint
-                # Use URL report with http:// prefix as workaround
-                url_endpoint = f"{VIRUSTOTAL_URL}/url/report"
-                # Convert domain to URL format for checking
-                domain_url = f"http://{resource}" if not resource.startswith(("http://", "https://")) else resource
-                # Base64 encode the domain URL (without padding)
-                encoded_resource = base64.urlsafe_b64encode(domain_url.encode()).decode().rstrip('=')
-                params = {
-                    "apikey": self.virustotal_key,
-                    "resource": encoded_resource
-                }
-            elif resource_type == "hash":
-                url_endpoint = f"{VIRUSTOTAL_URL}/file/report"
-                params = {
-                    "apikey": self.virustotal_key,
-                    "resource": resource
-                }
-            else:
-                return {
-                    "status": "error",
-                    "error": f"Unsupported resource type: {resource_type}"
-                }
+            try:
+                # Rate limiting for free tier (4 requests per minute = 15 seconds between requests)
+                # Track per key to allow better distribution
+                key_index = self.current_virustotal_key_index
+                current_time = time.time()
+                time_since_last_request = current_time - self.last_vt_request_times.get(key_index, 0)
+                if time_since_last_request < self.rate_limit_delay:
+                    sleep_time = self.rate_limit_delay - time_since_last_request
+                    time.sleep(sleep_time)
+                self.last_vt_request_times[key_index] = time.time()
+                
+                if resource_type == "url":
+                    # VirusTotal v2 API requires URL to be base64 encoded
+                    url_endpoint = f"{VIRUSTOTAL_URL}/url/report"
+                    # Base64 encode the URL (without padding, as VT expects)
+                    encoded_resource = base64.urlsafe_b64encode(resource.encode()).decode().rstrip('=')
+                    params = {
+                        "apikey": current_key,
+                        "resource": encoded_resource
+                    }
+                elif resource_type == "domain":
+                    # VirusTotal v2 API doesn't have a direct domain endpoint
+                    # Use URL report with http:// prefix as workaround
+                    url_endpoint = f"{VIRUSTOTAL_URL}/url/report"
+                    # Convert domain to URL format for checking
+                    domain_url = f"http://{resource}" if not resource.startswith(("http://", "https://")) else resource
+                    # Base64 encode the domain URL (without padding)
+                    encoded_resource = base64.urlsafe_b64encode(domain_url.encode()).decode().rstrip('=')
+                    params = {
+                        "apikey": current_key,
+                        "resource": encoded_resource
+                    }
+                elif resource_type == "hash":
+                    url_endpoint = f"{VIRUSTOTAL_URL}/file/report"
+                    params = {
+                        "apikey": current_key,
+                        "resource": resource
+                    }
+                else:
+                    return {
+                        "status": "error",
+                        "error": f"Unsupported resource type: {resource_type}"
+                    }
+                
+                response = requests.get(url_endpoint, params=params, timeout=15)
+                
+                # Check for rate limiting (HTTP 429 or 204) - try next key
+                if response.status_code == 429:
+                    self._rotate_virustotal_key()
+                    last_error = "Rate limit exceeded, trying next key..."
+                    if attempt < len(self.virustotal_keys) - 1:
+                        continue
+                    else:
+                        return {
+                            "status": "error",
+                            "error": "All VirusTotal API keys rate limited. Free tier allows 4 requests per minute per key."
+                        }
+                if response.status_code == 204:
+                    self._rotate_virustotal_key()
+                    last_error = "Rate limit exceeded (HTTP 204), trying next key..."
+                    if attempt < len(self.virustotal_keys) - 1:
+                        continue
+                    else:
+                        return {
+                            "status": "error",
+                            "error": "All VirusTotal API keys rate limited (HTTP 204). Free tier allows 4 requests per minute per key."
+                        }
             
-            response = requests.get(url_endpoint, params=params, timeout=15)
-            
-            # Check for rate limiting (HTTP 429 or 204)
-            if response.status_code == 429:
-                return {
-                    "status": "error",
-                    "error": "VirusTotal API rate limit exceeded. Free tier allows 4 requests per minute. Please wait and try again."
-                }
-            if response.status_code == 204:
-                return {
-                    "status": "error",
-                    "error": "VirusTotal API rate limit exceeded (HTTP 204). Free tier allows 4 requests per minute."
-                }
-            
-            # Check if response has content
-            if not response.text or not response.text.strip():
-                # Empty response might mean the resource hasn't been scanned yet
-                # For domains/URLs, return "clean" with a note instead of error
-                if resource_type in ["url", "domain"]:
+                # Check if response has content
+                if not response.text or not response.text.strip():
+                    # Empty response might mean the resource hasn't been scanned yet
+                    # For domains/URLs, return "clean" with a note instead of error
+                    if resource_type in ["url", "domain"]:
+                        return {
+                            "status": "clean",
+                            "positives": 0,
+                            "total": 0,
+                            "scan_date": None,
+                            "permalink": None,
+                            "message": "Resource not yet scanned by VirusTotal. Empty response may indicate the domain/URL hasn't been analyzed yet."
+                        }
+                    else:
+                        # For hashes, try next key if available
+                        self._rotate_virustotal_key()
+                        last_error = "Empty response, trying next key..."
+                        if attempt < len(self.virustotal_keys) - 1:
+                            continue
+                        else:
+                            return {
+                                "status": "error",
+                                "error": "VirusTotal API returned empty response for all keys. Possible causes: rate limiting (4 req/min), invalid API keys, or API issues."
+                            }
+                
+                # Check if response is HTML (error page) instead of JSON
+                if response.text.strip().startswith('<') or '<html' in response.text.lower()[:100]:
+                    self._rotate_virustotal_key()
+                    last_error = "HTML response (invalid endpoint/key), trying next key..."
+                    if attempt < len(self.virustotal_keys) - 1:
+                        continue
+                    else:
+                        return {
+                            "status": "error",
+                            "error": "VirusTotal API returned HTML instead of JSON for all keys. This may indicate invalid endpoints or API key issues."
+                        }
+                
+                # Check HTTP status code for authentication errors
+                if response.status_code == 401 or response.status_code == 403:
+                    self._rotate_virustotal_key()
+                    last_error = f"Authentication failed (HTTP {response.status_code}), trying next key..."
+                    if attempt < len(self.virustotal_keys) - 1:
+                        continue
+                    else:
+                        return {
+                            "status": "error",
+                            "error": f"All VirusTotal API keys authentication failed (HTTP {response.status_code}). Please check your API keys in .env file."
+                        }
+                
+                # Try to parse JSON
+                try:
+                    data = response.json()
+                except ValueError as e:
+                    # JSON decode error - response is not valid JSON
+                    error_preview = response.text[:200] if len(response.text) > 200 else response.text
+                    # Check for common error messages
+                    if "API key" in error_preview.lower() or "authentication" in error_preview.lower():
+                        self._rotate_virustotal_key()
+                        last_error = "Invalid API key detected, trying next key..."
+                        if attempt < len(self.virustotal_keys) - 1:
+                            continue
+                        else:
+                            return {
+                                "status": "error",
+                                "error": "All VirusTotal API keys appear to be invalid. Please check your API keys in .env file."
+                            }
+                    self._rotate_virustotal_key()
+                    last_error = f"Invalid JSON response, trying next key..."
+                    if attempt < len(self.virustotal_keys) - 1:
+                        continue
+                    else:
+                        return {
+                            "status": "error",
+                            "error": f"VirusTotal API returned invalid JSON for all keys. Response preview: {error_preview}"
+                        }
+                
+                # Check HTTP status code
+                if response.status_code != 200:
+                    error_msg = response.text[:200] if response.text else "No error message"
+                    self._rotate_virustotal_key()
+                    last_error = f"HTTP {response.status_code}: {error_msg}"
+                    if attempt < len(self.virustotal_keys) - 1:
+                        continue
+                    else:
+                        return {
+                            "status": "error",
+                            "error": f"VirusTotal API returned status {response.status_code} for all keys: {error_msg}"
+                        }
+                
+                # Check response code
+                response_code = data.get("response_code", -1)
+                
+                if response_code == 0:
+                    # Not found in VirusTotal database
                     return {
                         "status": "clean",
                         "positives": 0,
                         "total": 0,
                         "scan_date": None,
                         "permalink": None,
-                        "message": "Resource not yet scanned by VirusTotal. Empty response may indicate the domain/URL hasn't been analyzed yet."
+                        "message": "Resource not found in VirusTotal database"
                     }
+                elif response_code == 1:
+                    # Found - success!
+                    positives = data.get("positives", 0)
+                    total = data.get("total", 0)
+                    
+                    # Determine status
+                    if positives >= 5:
+                        status = "malicious"
+                    elif positives >= 1:
+                        status = "suspicious"
+                    else:
+                        status = "clean"
+                    
+                    return {
+                        "status": status,
+                        "positives": positives,
+                        "total": total,
+                        "scan_date": data.get("scan_date", "Unknown"),
+                        "permalink": data.get("permalink", ""),
+                        "sha256": data.get("sha256"),
+                        "md5": data.get("md5")
+                    }
+                else:
+                    # Unexpected response code - try next key
+                    self._rotate_virustotal_key()
+                    last_error = f"Unexpected response code: {response_code}"
+                    if attempt < len(self.virustotal_keys) - 1:
+                        continue
+                    else:
+                        return {
+                            "status": "error",
+                            "error": f"VirusTotal API returned unexpected code {response_code} for all keys"
+                        }
+                
+            except requests.exceptions.Timeout:
+                last_error = "Request timed out"
+                if attempt < len(self.virustotal_keys) - 1:
+                    self._rotate_virustotal_key()
+                    continue
                 else:
                     return {
                         "status": "error",
-                        "error": "VirusTotal API returned empty response. Possible causes: rate limiting (4 req/min), invalid API key, or API issues. Check your VIRUSTOTAL_API_KEY in .env file."
+                        "error": "VirusTotal API request timed out for all keys. Please try again later."
                     }
-            
-            # Check if response is HTML (error page) instead of JSON
-            if response.text.strip().startswith('<') or '<html' in response.text.lower()[:100]:
-                return {
-                    "status": "error",
-                    "error": "VirusTotal API returned HTML instead of JSON. This may indicate an invalid endpoint or API key issue."
-                }
-            
-            # Try to parse JSON
-            try:
-                data = response.json()
-            except ValueError as e:
-                # JSON decode error - response is not valid JSON
-                error_preview = response.text[:200] if len(response.text) > 200 else response.text
-                # Check for common error messages
-                if "API key" in error_preview.lower() or "authentication" in error_preview.lower():
-                    return {
-                        "status": "error",
-                        "error": "VirusTotal API key appears to be invalid. Please check your VIRUSTOTAL_API_KEY in .env file."
-                    }
-                return {
-                    "status": "error",
-                    "error": f"VirusTotal API returned invalid JSON (may be rate limited or API key issue). Response preview: {error_preview}"
-                }
-            
-            # Check HTTP status code
-            if response.status_code != 200:
-                error_msg = response.text[:200] if response.text else "No error message"
-                if response.status_code == 403:
-                    return {
-                        "status": "error",
-                        "error": "VirusTotal API returned 403 Forbidden. Your API key may be invalid or expired. Check your VIRUSTOTAL_API_KEY in .env file."
-                    }
-                return {
-                    "status": "error",
-                    "error": f"VirusTotal API returned status {response.status_code}: {error_msg}"
-                }
-            
-            # Check response code
-            response_code = data.get("response_code", -1)
-            
-            if response_code == 0:
-                # Not found in VirusTotal database
-                return {
-                    "status": "clean",
-                    "positives": 0,
-                    "total": 0,
-                    "scan_date": None,
-                    "permalink": None,
-                    "message": "Resource not found in VirusTotal database"
-                }
-            elif response_code == 1:
-                # Found
-                positives = data.get("positives", 0)
-                total = data.get("total", 0)
-                
-                # Determine status
-                if positives >= 5:
-                    status = "malicious"
-                elif positives >= 1:
-                    status = "suspicious"
+            except requests.exceptions.RequestException as e:
+                last_error = f"Request error: {str(e)}"
+                if attempt < len(self.virustotal_keys) - 1:
+                    self._rotate_virustotal_key()
+                    continue
                 else:
-                    status = "clean"
-                
-                return {
-                    "status": status,
-                    "positives": positives,
-                    "total": total,
-                    "scan_date": data.get("scan_date", "Unknown"),
-                    "permalink": data.get("permalink", ""),
-                    "sha256": data.get("sha256"),
-                    "md5": data.get("md5")
-                }
-            else:
-                return {
-                    "status": "error",
-                    "error": f"VirusTotal API returned code: {response_code}"
-                }
-                
-        except requests.exceptions.Timeout:
-            return {
-                "status": "error",
-                "error": "VirusTotal API request timed out. Please try again later."
-            }
-        except requests.exceptions.RequestException as e:
-            return {
-                "status": "error",
-                "error": f"VirusTotal API error: {str(e)}"
-            }
-        except ValueError as e:
-            # JSON decode errors are caught above, but catch any other value errors
-            return {
-                "status": "error",
-                "error": f"VirusTotal response parsing error: {str(e)}"
-            }
-        except Exception as e:
-            return {
-                "status": "error",
-                "error": f"Unexpected error: {str(e)}"
-            }
+                    return {
+                        "status": "error",
+                        "error": f"All VirusTotal API keys failed. Last error: {last_error}"
+                    }
+            except Exception as e:
+                last_error = f"Unexpected error: {str(e)}"
+                if attempt < len(self.virustotal_keys) - 1:
+                    self._rotate_virustotal_key()
+                    continue
+                else:
+                    return {
+                        "status": "error",
+                        "error": f"All VirusTotal API keys failed. Last error: {last_error}"
+                    }
+        
+        # If we get here, all keys failed
+        return {
+            "status": "error",
+            "error": f"All VirusTotal API keys failed. Last error: {last_error or 'Unknown error'}"
+        }
     
     def check_all_iocs(self, iocs: Dict[str, List[str]]) -> Dict[str, Dict[str, Any]]:
         """
