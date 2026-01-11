@@ -1,15 +1,20 @@
 import json
 import traceback
+from datetime import datetime
 
 import streamlit as st
 from pipeline import NeuroSymbolicPipeline
+from pdf_handler import PDFHandler
+from report_generator import ReportGenerator
 
 import requests
 
 # -------------------------------------------------
-# Init pipeline
+# Init pipeline and handlers
 # -------------------------------------------------
 pipeline = NeuroSymbolicPipeline()
+pdf_handler = PDFHandler()
+report_generator = ReportGenerator()
 
 # -------------------------------------------------
 # Page Configuration & Custom CSS
@@ -177,21 +182,63 @@ st.markdown("### *Advanced AI-Powered Threat Intelligence Platform*")
 st.markdown("---")
 
 # -------------------------------------------------
-# Input Section
+# Input Section - Tabs for Text and PDF
 # -------------------------------------------------
 st.markdown("### 📝 Threat Input")
-st.markdown(
-    "Paste a CVE description or threat text below. "
-    "The system will use a local LLM + cyber ontology to extract tactics/techniques, "
-    "estimate risk, extract IOCs, suggest defenses, and check for consistency."
-)
 
-user_text = st.text_area(
-    "Paste CVE / threat text:",
-    height=200,
-    placeholder="Example: CVE-2021-44228 allows remote code execution on a public-facing web app...",
-    label_visibility="collapsed"
-)
+input_tab1, input_tab2 = st.tabs(["📄 Text Input", "📎 PDF Upload"])
+
+user_text = ""
+pdf_text = ""
+
+with input_tab1:
+    st.markdown(
+        "Paste a CVE description or threat text below. "
+        "The system will use a local LLM + cyber ontology to extract tactics/techniques, "
+        "estimate risk, extract IOCs, suggest defenses, and check for consistency."
+    )
+    
+    user_text = st.text_area(
+        "Paste CVE / threat text:",
+        height=200,
+        placeholder="Example: CVE-2021-44228 allows remote code execution on a public-facing web app...",
+        label_visibility="collapsed"
+    )
+
+with input_tab2:
+    st.markdown(
+        "Upload a PDF threat report. The system will extract text and analyze it automatically."
+    )
+    
+    uploaded_file = st.file_uploader(
+        "Choose a PDF file",
+        type=['pdf'],
+        label_visibility="collapsed"
+    )
+    
+    if uploaded_file is not None:
+        with st.spinner("📄 Extracting text from PDF..."):
+            pdf_bytes = uploaded_file.read()
+            pdf_text = pdf_handler.extract_text_from_bytes(pdf_bytes)
+            
+            if pdf_text:
+                st.success("✅ PDF text extracted successfully!")
+                st.markdown("**Extracted Text Preview:**")
+                st.text_area(
+                    "Extracted text (first 500 chars):",
+                    value=pdf_text[:500] + ("..." if len(pdf_text) > 500 else ""),
+                    height=150,
+                    disabled=True,
+                    label_visibility="collapsed"
+                )
+                # Use PDF text as input
+                user_text = pdf_text
+            else:
+                st.error("❌ Failed to extract text from PDF. Please try another file or use text input.")
+
+# Use PDF text if available, otherwise use manual text input
+if not user_text and pdf_text:
+    user_text = pdf_text
 
 # -------------------------------------------------
 # Analyze button with robust error handling
@@ -313,10 +360,11 @@ if analyze_button:
             # -------------------------------------------------
             # Tabbed Results Display
             # -------------------------------------------------
-            tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+            tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
                 "🎯 MITRE Mapping",
                 "🤖 LLM Analysis",
                 "🔍 IOCs & Indicators",
+                "🛡️ IOC Reputation",
                 "🛡️ Defense Recommendations",
                 "📋 Full Details",
                 "📄 Report View"
@@ -452,8 +500,131 @@ if analyze_button:
                             for hash_val in iocs["hashes"]:
                                 st.code(hash_val, language=None)
             
-            # Tab 4: Defense Recommendations
+            # Tab 4: IOC Reputation
             with tab4:
+                st.markdown("### 🛡️ IOC Reputation & Validation")
+                
+                ioc_reputation = result.get("ioc_reputation", {})
+                
+                if not ioc_reputation or "error" in ioc_reputation:
+                    if ioc_reputation.get("error"):
+                        st.warning(f"⚠️ {ioc_reputation['error']}")
+                    else:
+                        st.info("ℹ️ No IOC reputation data available. Ensure API keys are configured in .env file.")
+                else:
+                    # IP Addresses Reputation
+                    if ioc_reputation.get("ip_addresses"):
+                        st.markdown("#### 🌐 IP Address Reputation (AbuseIPDB)")
+                        for ip, rep_data in ioc_reputation["ip_addresses"].items():
+                            status = rep_data.get("status", "unknown")
+                            status_color = {
+                                "malicious": "🔴",
+                                "suspicious": "🟠",
+                                "clean": "🟢",
+                                "error": "⚪"
+                            }.get(status, "⚪")
+                            
+                            with st.expander(f"{status_color} {ip} - {status.upper()}"):
+                                if status == "error":
+                                    st.error(f"Error: {rep_data.get('error', 'Unknown error')}")
+                                else:
+                                    col1, col2 = st.columns(2)
+                                    with col1:
+                                        st.metric("Abuse Confidence", f"{rep_data.get('abuse_confidence', 0)}%")
+                                        st.metric("Total Reports", rep_data.get('reports', 0))
+                                    with col2:
+                                        st.write(f"**ISP:** {rep_data.get('isp', 'Unknown')}")
+                                        st.write(f"**Country:** {rep_data.get('country', 'Unknown')}")
+                                        st.write(f"**Usage Type:** {rep_data.get('usage_type', 'Unknown')}")
+                                        st.write(f"**Last Reported:** {rep_data.get('last_reported', 'Never')}")
+                    
+                    # URLs Reputation
+                    if ioc_reputation.get("urls"):
+                        st.markdown("#### 🔗 URL Reputation (VirusTotal)")
+                        for url, rep_data in ioc_reputation["urls"].items():
+                            status = rep_data.get("status", "unknown")
+                            status_color = {
+                                "malicious": "🔴",
+                                "suspicious": "🟠",
+                                "clean": "🟢",
+                                "error": "⚪"
+                            }.get(status, "⚪")
+                            
+                            with st.expander(f"{status_color} {url} - {status.upper()}"):
+                                if status == "error":
+                                    st.error(f"Error: {rep_data.get('error', 'Unknown error')}")
+                                else:
+                                    positives = rep_data.get("positives", 0)
+                                    total = rep_data.get("total", 0)
+                                    col1, col2 = st.columns(2)
+                                    with col1:
+                                        st.metric("Detection Engines", f"{positives}/{total}")
+                                        if rep_data.get("scan_date"):
+                                            st.write(f"**Last Scanned:** {rep_data['scan_date']}")
+                                    with col2:
+                                        if rep_data.get("permalink"):
+                                            st.markdown(f"**[View on VirusTotal]({rep_data['permalink']})**")
+                    
+                    # Domains Reputation
+                    if ioc_reputation.get("domains"):
+                        st.markdown("#### 🌍 Domain Reputation (VirusTotal)")
+                        for domain, rep_data in ioc_reputation["domains"].items():
+                            status = rep_data.get("status", "unknown")
+                            status_color = {
+                                "malicious": "🔴",
+                                "suspicious": "🟠",
+                                "clean": "🟢",
+                                "error": "⚪"
+                            }.get(status, "⚪")
+                            
+                            with st.expander(f"{status_color} {domain} - {status.upper()}"):
+                                if status == "error":
+                                    st.error(f"Error: {rep_data.get('error', 'Unknown error')}")
+                                else:
+                                    positives = rep_data.get("positives", 0)
+                                    total = rep_data.get("total", 0)
+                                    col1, col2 = st.columns(2)
+                                    with col1:
+                                        st.metric("Detection Engines", f"{positives}/{total}")
+                                        if rep_data.get("scan_date"):
+                                            st.write(f"**Last Scanned:** {rep_data['scan_date']}")
+                                    with col2:
+                                        if rep_data.get("permalink"):
+                                            st.markdown(f"**[View on VirusTotal]({rep_data['permalink']})**")
+                    
+                    # Hashes Reputation
+                    if ioc_reputation.get("hashes"):
+                        st.markdown("#### 🔐 Hash Reputation (VirusTotal)")
+                        for hash_val, rep_data in ioc_reputation["hashes"].items():
+                            status = rep_data.get("status", "unknown")
+                            status_color = {
+                                "malicious": "🔴",
+                                "suspicious": "🟠",
+                                "clean": "🟢",
+                                "error": "⚪"
+                            }.get(status, "⚪")
+                            
+                            with st.expander(f"{status_color} {hash_val[:16]}... - {status.upper()}"):
+                                if status == "error":
+                                    st.error(f"Error: {rep_data.get('error', 'Unknown error')}")
+                                else:
+                                    positives = rep_data.get("positives", 0)
+                                    total = rep_data.get("total", 0)
+                                    col1, col2 = st.columns(2)
+                                    with col1:
+                                        st.metric("Detection Engines", f"{positives}/{total}")
+                                        if rep_data.get("scan_date"):
+                                            st.write(f"**Last Scanned:** {rep_data['scan_date']}")
+                                        if rep_data.get("md5"):
+                                            st.write(f"**MD5:** {rep_data['md5']}")
+                                        if rep_data.get("sha256"):
+                                            st.write(f"**SHA256:** {rep_data['sha256'][:32]}...")
+                                    with col2:
+                                        if rep_data.get("permalink"):
+                                            st.markdown(f"**[View on VirusTotal]({rep_data['permalink']})**")
+            
+            # Tab 5: Defense Recommendations
+            with tab5:
                 st.markdown("### 🛡️ Defense Recommendations")
                 
                 col1, col2 = st.columns(2)
@@ -476,8 +647,8 @@ if analyze_button:
                     else:
                         st.info("No D3FEND-style defensive techniques available for this technique.")
             
-            # Tab 5: Full Details
-            with tab5:
+            # Tab 6: Full Details
+            with tab6:
                 st.markdown("### 📋 Complete Analysis Details")
                 
                 with st.expander("🔍 Full Result JSON", expanded=False):
@@ -496,8 +667,8 @@ if analyze_button:
                         else:
                             st.write(value)
                         st.markdown("---")
-            # Tab 6: Printable Report View
-            with tab6:
+            # Tab 7: Printable Report View
+            with tab7:
                 st.markdown("## 📄 Printable Threat Report")
                 st.markdown("### 📝 Input Text")
                 st.markdown(f"> {user_text}")
@@ -556,4 +727,23 @@ if analyze_button:
             
                 st.markdown("### ✅ Symbolic Consistency Note")
                 st.markdown(result.get("symbolic_note", "_No note available._"))
+            
+            # Download Report Button
+            st.markdown("---")
+            st.markdown("### 📥 Download Analysis Report")
+            
+            try:
+                pdf_buffer = report_generator.generate_report(result, user_text)
+                st.download_button(
+                    label="📄 Download PDF Report",
+                    data=pdf_buffer,
+                    file_name=f"threat_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True,
+                    type="primary"
+                )
+            except Exception as e:
+                st.error(f"❌ Error generating report: {str(e)}")
+                with st.expander("Technical details"):
+                    st.code(traceback.format_exc())
 

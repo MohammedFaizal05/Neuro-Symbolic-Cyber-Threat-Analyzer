@@ -9,6 +9,7 @@ tqdm==4.66.1
 
 # For ontology parsing & reasoning
 owlrl==6.0.2
+owlready2>=0.40
 
 # If using local LLM calls (Ollama API)
 httpx==0.26.0
@@ -18,3 +19,10 @@ rich==13.7.0
 
 # Optional but recommended for debugging
 python-dotenv==1.0.1
+
+# PDF handling
+PyPDF2>=3.0.0
+pdfminer.six>=20221105
+
+# PDF report generation
+reportlab>=4.0.0

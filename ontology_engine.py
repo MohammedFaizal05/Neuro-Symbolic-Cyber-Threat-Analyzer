@@ -1,7 +1,24 @@
 from owlready2 import get_ontology
 import re
+import os
 
-ONTO_PATH = "../ontology/cyber_ontology.owl"
+# Try multiple possible paths for the ontology file
+ONTO_PATH = None
+possible_paths = [
+    "cyber_ontology.owl",  # Same directory
+    "../ontology/cyber_ontology.owl",  # Parent ontology directory
+    os.path.join(os.path.dirname(__file__), "cyber_ontology.owl"),  # Same directory as this file
+    os.path.join(os.path.dirname(__file__), "..", "ontology", "cyber_ontology.owl"),  # Relative to this file
+]
+
+for path in possible_paths:
+    if os.path.exists(path):
+        ONTO_PATH = path
+        break
+
+if ONTO_PATH is None:
+    # Default fallback
+    ONTO_PATH = "cyber_ontology.owl"
 
 
 def _normalize(s: str) -> str:

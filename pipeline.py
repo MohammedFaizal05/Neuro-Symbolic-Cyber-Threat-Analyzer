@@ -1,5 +1,6 @@
 from llm_client import LLMClient
 from ontology_engine import OntologyEngine
+from ioc_reputation import IOCReputationChecker
 import re
 from typing import Dict, Any, List
 
@@ -91,9 +92,11 @@ DEFENSE_KB = {_norm(k): v for k, v in DEFENSE_KB_RAW.items()}
 
 
 class NeuroSymbolicPipeline:
-    def __init__(self):
+    def __init__(self, check_ioc_reputation: bool = True):
         self.llm = LLMClient()
         self.onto = OntologyEngine()
+        self.check_ioc_reputation = check_ioc_reputation
+        self.ioc_checker = IOCReputationChecker() if check_ioc_reputation else None
 
     # ---------------- IOC EXTRACTION ----------------
     def _extract_iocs(self, text: str) -> Dict[str, List[str]]:
@@ -315,6 +318,15 @@ class NeuroSymbolicPipeline:
 
         # 4) IOC extraction
         iocs = self._extract_iocs(text)
+        
+        # 4.5) IOC reputation checking (optional, server-side only)
+        ioc_reputation = {}
+        if self.check_ioc_reputation and self.ioc_checker and any(iocs.get(k) for k in ["ip_addresses", "urls", "emails", "hashes"]):
+            try:
+                ioc_reputation = self.ioc_checker.check_all_iocs(iocs)
+            except Exception as e:
+                # Fail gracefully - reputation check is optional
+                ioc_reputation = {"error": f"Reputation check failed: {str(e)}"}
 
         # 5) Risk scoring
         risk_level = self._assess_risk(
@@ -368,6 +380,7 @@ class NeuroSymbolicPipeline:
             "symbolic_note": symbolic_note,
             "final_explanation": llm_result.get("brief_reasoning", ""),
             "iocs": iocs,
+            "ioc_reputation": ioc_reputation,
             "risk_level": risk_level,
             "confidence": confidence,
             "mitre_id": mitre_id,
