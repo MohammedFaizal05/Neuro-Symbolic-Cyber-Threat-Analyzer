@@ -150,10 +150,14 @@ class IOCReputationChecker:
                     "resource": resource
                 }
             elif resource_type == "domain":
-                url_endpoint = f"{VIRUSTOTAL_URL}/domain/report"
+                # VirusTotal v2 API doesn't have a direct domain endpoint
+                # Use URL report with http:// prefix as workaround
+                url_endpoint = f"{VIRUSTOTAL_URL}/url/report"
+                # Convert domain to URL format for checking
+                domain_url = f"http://{resource}" if not resource.startswith(("http://", "https://")) else resource
                 params = {
                     "apikey": self.virustotal_key,
-                    "domain": resource
+                    "resource": domain_url
                 }
             elif resource_type == "hash":
                 url_endpoint = f"{VIRUSTOTAL_URL}/file/report"
@@ -168,8 +172,38 @@ class IOCReputationChecker:
                 }
             
             response = requests.get(url_endpoint, params=params, timeout=15)
-            response.raise_for_status()
-            data = response.json()
+            
+            # Check if response has content
+            if not response.text or not response.text.strip():
+                return {
+                    "status": "error",
+                    "error": "VirusTotal API returned empty response. This may indicate rate limiting, invalid API key, or API issues."
+                }
+            
+            # Check if response is HTML (error page) instead of JSON
+            if response.text.strip().startswith('<') or '<html' in response.text.lower()[:100]:
+                return {
+                    "status": "error",
+                    "error": "VirusTotal API returned HTML instead of JSON. This may indicate an invalid endpoint or API key issue."
+                }
+            
+            # Try to parse JSON
+            try:
+                data = response.json()
+            except ValueError as e:
+                # JSON decode error - response is not valid JSON
+                error_preview = response.text[:200] if len(response.text) > 200 else response.text
+                return {
+                    "status": "error",
+                    "error": f"VirusTotal API returned invalid JSON (may be rate limited or API key issue). Response preview: {error_preview}"
+                }
+            
+            # Check HTTP status code
+            if response.status_code != 200:
+                return {
+                    "status": "error",
+                    "error": f"VirusTotal API returned status {response.status_code}: {response.text[:200]}"
+                }
             
             # Check response code
             response_code = data.get("response_code", -1)
@@ -212,10 +246,21 @@ class IOCReputationChecker:
                     "error": f"VirusTotal API returned code: {response_code}"
                 }
                 
+        except requests.exceptions.Timeout:
+            return {
+                "status": "error",
+                "error": "VirusTotal API request timed out. Please try again later."
+            }
         except requests.exceptions.RequestException as e:
             return {
                 "status": "error",
                 "error": f"VirusTotal API error: {str(e)}"
+            }
+        except ValueError as e:
+            # JSON decode errors are caught above, but catch any other value errors
+            return {
+                "status": "error",
+                "error": f"VirusTotal response parsing error: {str(e)}"
             }
         except Exception as e:
             return {
