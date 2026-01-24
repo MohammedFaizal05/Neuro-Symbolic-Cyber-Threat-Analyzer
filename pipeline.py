@@ -5,90 +5,9 @@ import re
 from typing import Dict, Any, List
 
 # ---------------- SMALL NORMALIZER ----------------
-def _norm(s: str) -> str:
-    return re.sub(r"[^a-z0-9]", "", s.lower()) if s else ""
-
-
-# ---------------- DEFENSE KNOWLEDGE BASE (RAW) ----------------
-DEFENSE_KB_RAW = {
-    "Exploit Public-Facing Application": {
-        "prevention": [
-            "Apply security patches immediately.",
-            "Use a Web Application Firewall (WAF) in front of public services.",
-            "Perform routine vulnerability scanning on internet-facing assets.",
-            "Disable or restrict unnecessary exposed services.",
-            "Use a reverse proxy to hide internal application servers."
-        ],
-        "d3fend": [
-            "Application Hardening",
-            "Network Boundary Enforcement",
-            "Input Validation",
-            "Dynamic Application Security Testing (DAST)"
-        ]
-    },
-
-    "Phishing": {
-        "prevention": [
-            "Enable strong email filtering and spam protection.",
-            "Block known malicious domains, IPs, and URLs.",
-            "Provide regular phishing awareness training to users.",
-            "Enforce Multi-Factor Authentication (MFA) for all accounts.",
-            "Use attachment sandboxing and URL rewriting for external emails."
-        ],
-        "d3fend": [
-            "Email Filtering",
-            "Malicious Attachment Detection",
-            "Credential Hardening",
-            "User Behavior Analytics"
-        ]
-    },
-
-    "CommandLineExecution": {
-        "prevention": [
-            "Restrict or disable unnecessary command-line interpreters (e.g., PowerShell, cmd).",
-            "Use application allowlisting for critical servers and endpoints.",
-            "Monitor command-line usage and arguments for anomalies.",
-            "Enable script block and module logging for PowerShell."
-        ],
-        "d3fend": [
-            "Execution Isolation",
-            "Command Monitoring",
-            "Process Whitelisting"
-        ]
-    },
-
-    "Privilege Escalation": {
-        "prevention": [
-            "Apply OS and kernel patches promptly.",
-            "Use the principle of least privilege for all accounts.",
-            "Disable unnecessary local admin and sudo rights.",
-            "Use OS-level hardening (SELinux, AppArmor, MAC policies).",
-            "Monitor logs for suspicious privilege escalation activity."
-        ],
-        "d3fend": [
-            "Credential Hardening",
-            "Privilege Restriction",
-            "Access Logging"
-        ]
-    },
-
-    "Credential Dumping": {
-        "prevention": [
-            "Disable or restrict access to LSASS and sensitive security subsystems.",
-            "Use Credential Guard or similar protections where available.",
-            "Avoid storing clear-text passwords and limit cached credentials.",
-            "Monitor for use of known credential dumping tools (e.g., Mimikatz)."
-        ],
-        "d3fend": [
-            "Credential Encryption",
-            "Account Monitoring",
-            "Security API Hooking"
-        ]
-    }
-}
-
-# Normalize keys for easier matching
-DEFENSE_KB = {_norm(k): v for k, v in DEFENSE_KB_RAW.items()}
+# ---------------- DEFENSE KNOWLEDGE BASE ----------------
+# NOTE: Defense knowledge is now sourced dynamically from the ontology (cyber_ontology.owl)
+# via the OntologyEngine classes (hasPreventionRecommendation, hasDetectionLogic, etc.)
 
 
 class NeuroSymbolicPipeline:
@@ -342,18 +261,23 @@ class NeuroSymbolicPipeline:
         # 7) MITRE ID + clean technique name
         mitre_id, nice_tech_name = self._split_mitre_technique(mapped_technique)
 
-        # 8) Defense recommendations lookup
-        defense_data = {"prevention": [], "d3fend": []}
-        # Try a few candidate keys: LLM technique name, ontology tail
-        candidates = [
-            technique_name,
-            (mapped_technique or "").split("_")[-1] if mapped_technique else "",
-        ]
-        for cand in candidates:
-            key = _norm(cand)
-            if key and key in DEFENSE_KB:
-                defense_data = DEFENSE_KB[key]
-                break
+        # 8) Defense recommendations lookup (Fully Dynamic from Ontology)
+        defense_data = {
+            "prevention": [],
+            "detection": [],
+            "d3fend": []
+        }
+        
+        if technique_matches:
+            # Use the best match from the ontology
+            best_tech = technique_matches[0]
+            
+            # Fetch properties dynamically
+            defense_data["prevention"] = self.onto.get_prevention_recommendations(best_tech)
+            defense_data["detection"] = self.onto.get_detection_logic(best_tech)
+            defense_data["d3fend"] = self.onto.get_d3fend_mitigations(best_tech)
+            
+            # If empty, we can try to fallback to tactic-based generic advice (optional, skipping for now)
 
         # 9) Attack summary
         attack_summary = self._build_summary(
@@ -373,12 +297,20 @@ class NeuroSymbolicPipeline:
             related_malware = [m.name for m in self.onto.get_malware_for_technique(tech_ind)]
             related_actors = [a.name for a in self.onto.get_actors_for_technique(tech_ind)]
 
+        # 11) CVE Auto-Promotion
+        # If no explicit CVE was found in the text, but the LLM suggested related CVEs,
+        # promote the first suggestion to be the primary 'cve_id'.
+        # This ensures it appears in the UI header and PDF report.
+        if not llm_result.get("cve_id") and llm_result.get("related_cves"):
+             llm_result["cve_id"] = llm_result["related_cves"][0]
+
         return {
             "llm_raw": llm_result,
             "mapped_technique": mapped_technique,
             "mapped_tactics": mapped_tactics,
             "symbolic_note": symbolic_note,
             "final_explanation": llm_result.get("brief_reasoning", ""),
+            "related_cves": llm_result.get("related_cves", []),
             "iocs": iocs,
             "ioc_reputation": ioc_reputation,
             "risk_level": risk_level,
@@ -387,6 +319,7 @@ class NeuroSymbolicPipeline:
             "nice_technique_name": nice_tech_name,
             "attack_summary": attack_summary,
             "defense_recommendations": defense_data.get("prevention", []),
+            "defense_detection": defense_data.get("detection", []),
             "defense_d3fend": defense_data.get("d3fend", []),
             "related_malware": related_malware,
             "related_actors": related_actors,

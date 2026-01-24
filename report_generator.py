@@ -214,7 +214,8 @@ class ReportGenerator:
             ["CVE ID", llm_raw.get("cve_id", "N/A")],
             ["Vulnerability Type", llm_raw.get("vulnerability_type", "N/A")],
             ["Possible Tactic", llm_raw.get("possible_tactic", "N/A")],
-            ["Possible Technique", llm_raw.get("possible_technique_name", "N/A")]
+            ["Possible Technique", llm_raw.get("possible_technique_name", "N/A")],
+            ["Related CVEs", ", ".join(analysis_result.get("related_cves", [])) or "None"]
         ]
         
         llm_table = Table(llm_data, colWidths=[2*inch, 4*inch])
@@ -303,6 +304,13 @@ class ReportGenerator:
         if defense_pre:
             story.append(Paragraph("Prevention Measures", self.subheading_style))
             for i, item in enumerate(defense_pre, 1):
+                story.append(Paragraph(f"{i}. {item}", self.styles['Normal']))
+            story.append(Spacer(1, 0.1*inch))
+        
+        defense_det = analysis_result.get("defense_detection", [])
+        if defense_det:
+            story.append(Paragraph("Detection Logic", self.subheading_style))
+            for i, item in enumerate(defense_det, 1):
                 story.append(Paragraph(f"{i}. {item}", self.styles['Normal']))
             story.append(Spacer(1, 0.1*inch))
         
