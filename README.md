@@ -1,4 +1,4 @@
-# 🧠🔐 Neuro-Symbolic Cyber Threat Analyzer  
+# 🧠🔐 An AI-Driven Neuro-Symbolic Cybersecurity Platform for Threat Intelligence, IOC Validation, and MITRE ATTACK Mapping
 A hybrid AI-powered system that combines **Large Language Models (LLaMA3:8B)** with **ontology-based symbolic reasoning** to perform automated, explainable Cyber Threat Intelligence (CTI) analysis.
 
 ---
